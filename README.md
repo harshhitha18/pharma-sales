@@ -95,7 +95,7 @@ pip install streamlit pandas numpy plotly scikit-learn prophet matplotlib statsm
 | Total Records | 900 |
 | Products | 7 |
 | Regions | Multiple |
-| Date Range | 2023 – 2024 
+| Date Range | 2023 – 2024 |
 
 ---
 
