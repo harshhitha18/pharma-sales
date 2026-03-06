@@ -1,4 +1,4 @@
-# app.py — Pharma Sales Intelligence Platform (Enhanced)
+# app.py — Pharma Sales Intelligence Platform
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -551,8 +551,8 @@ with tab4:
                 y=pd.concat([forecast['yhat_upper'], forecast['yhat_lower'][::-1]]),
                 fill='toself', fillcolor='rgba(239,83,80,0.10)',
                 line=dict(color='rgba(255,255,255,0)'), name="80% Confidence Band"))
-            fig_fc.add_vline(x=str(hist_end), line_dash="dash",
-                             line_color="#90a4ae", annotation_text="Forecast Start")
+            fig_fc.add_vline(x=pd.Timestamp(hist_end).timestamp() * 1000, line_dash="dash",
+                 line_color="#90a4ae", annotation_text="Forecast Start")
             fig_fc.update_layout(
                 paper_bgcolor='#fff', plot_bgcolor='#f8fbff',
                 margin=dict(l=10,r=10,t=10,b=10), height=380,
