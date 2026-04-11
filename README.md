@@ -6,6 +6,10 @@ A powerful, interactive business intelligence dashboard built for pharmaceutical
 
 ---
 
+🚀 **Live Demo:** https://pharmaa-sales.streamlit.app/
+
+---
+
 ## 🚀 Features
 
 - **📊 Overview Dashboard** — KPIs, revenue trends, regional breakdowns, and product performance at a glance
