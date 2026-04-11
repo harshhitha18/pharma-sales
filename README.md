@@ -97,14 +97,3 @@ pip install streamlit pandas numpy plotly scikit-learn prophet matplotlib statsm
 | Regions | Multiple |
 | Date Range | 2023 – 2024 |
 
----
-
-## 📸 Screenshots
-
-> Dashboard with product filters, revenue trends, ML predictions, and Prophet forecasting.
-
----
-
-## 📄 License
-
-This project is open source and available under the [MIT License](LICENSE).
