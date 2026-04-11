@@ -750,13 +750,13 @@ with tab6:
             </div>""", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# FOOTER
+# FOOTER (UPDATED FOR PROFESSIONAL USE)
 # ─────────────────────────────────────────────
 st.markdown("---")
 st.markdown("""
 <div style="text-align:center;color:#90a4ae;font-size:0.82rem;padding:1rem">
-    💊 <b>Pharma Sales Intelligence Platform</b> &nbsp;|&nbsp;
-    Streamlit · Prophet · Scikit-learn · Plotly &nbsp;|&nbsp;
-    Final Year Project
+    💊 <b>Pharma Sales Intelligence Platform</b><br>
+    End-to-End ML System for Demand Forecasting, Anomaly Detection & Business Insights<br>
+    <span style="font-size:0.75rem;">Built with Streamlit · Prophet · Scikit-learn · Plotly</span>
 </div>
 """, unsafe_allow_html=True)
