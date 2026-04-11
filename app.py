@@ -1,4 +1,3 @@
-# app.py — Pharma Sales Intelligence Platform
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -15,6 +14,7 @@ from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error
 from sklearn.preprocessing import StandardScaler
 import pickle
 import warnings
+
 warnings.filterwarnings("ignore")
 
 try:
@@ -42,9 +42,7 @@ st.set_page_config(
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-
     html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
-
     .stApp { background: #f0f4f8; }
     section[data-testid="stSidebar"] {
         background: linear-gradient(180deg, #0f2942 0%, #1a3d5c 100%);
@@ -55,7 +53,6 @@ st.markdown("""
         font-weight: 600; letter-spacing: 0.04em;
         font-size: 0.78rem; text-transform: uppercase;
     }
-
     .app-header {
         background: linear-gradient(135deg, #0f2942 0%, #1565c0 60%, #0288d1 100%);
         padding: 2rem 2.5rem; border-radius: 16px; margin-bottom: 1.5rem;
@@ -63,8 +60,7 @@ st.markdown("""
         box-shadow: 0 8px 32px rgba(15,41,66,0.18);
     }
     .app-header h1 { color:#fff; font-size:2rem; font-weight:700; margin:0; letter-spacing:-0.5px; }
-    .app-header p  { color:#90caf9; margin:0; font-size:0.95rem; }
-
+    .app-header p { color:#90caf9; margin:0; font-size:0.95rem; }
     .stTabs [data-baseweb="tab-list"] {
         background:#fff; padding:6px; border-radius:12px;
         gap:4px; box-shadow:0 2px 8px rgba(0,0,0,0.06);
@@ -77,45 +73,48 @@ st.markdown("""
         background: linear-gradient(135deg,#1565c0,#0288d1) !important;
         color:#fff !important; box-shadow:0 4px 12px rgba(21,101,192,0.3);
     }
-
     .kpi-card {
         background:#fff; border-radius:14px; padding:1.4rem 1.6rem;
         box-shadow:0 2px 12px rgba(0,0,0,0.06); border-top:4px solid #1565c0;
         transition:transform 0.2s;
     }
     .kpi-card:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.10); }
-    .kpi-label  { font-size:0.75rem; font-weight:600; text-transform:uppercase;
+    .kpi-label { font-size:0.75rem; font-weight:600; text-transform:uppercase;
                   letter-spacing:0.08em; color:#78909c; margin-bottom:0.4rem; }
-    .kpi-value  { font-size:1.7rem; font-weight:700; color:#0f2942; font-family:'DM Mono',monospace; }
+    .kpi-value { font-size:1.7rem; font-weight:700; color:#0f2942; font-family:'DM Mono',monospace; }
     .kpi-delta-pos { font-size:0.82rem; color:#2e7d32; font-weight:600; }
     .kpi-delta-neg { font-size:0.82rem; color:#c62828; font-weight:600; }
-
     .section-title {
         font-size:1.15rem; font-weight:700; color:#0f2942;
         border-left:4px solid #1565c0; padding-left:0.75rem;
         margin:1.5rem 0 1rem 0;
     }
-
     .forecast-banner {
         background:linear-gradient(90deg,#e8f5e9,#c8e6c9);
         border-left:5px solid #2e7d32; padding:1rem 1.4rem;
         border-radius:0 10px 10px 0; margin-bottom:0.75rem;
     }
-
     hr { border:none; border-top:1px solid #e0e7ef; margin:1.5rem 0; }
     .stDataFrame { border-radius:10px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
 </style>
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# CONSTANTS
+# CONSTANTS & HELPER FUNCTION
 # ─────────────────────────────────────────────
-DATA_CSV        = "pharma_sales_dataset.csv"
+DATA_CSV = "pharma_sales_dataset.csv"
 BEST_MODEL_FILE = "best_model.pkl"
 PALETTE = ["#1565c0","#0288d1","#26a69a","#66bb6a","#ffa726","#ef5350","#ab47bc","#5c6bc0"]
 PRODUCTS = ["PainRelief Tablet","Diabetes Control","Cough Syrup",
             "Vitamin C","Antibiotic Capsule","Antacid Tablet","Antihistamine"]
-REGIONS  = ["North","South","East","West","Central"]
+REGIONS = ["North","South","East","West","Central"]
+
+def get_resample_freq(granularity: str) -> str:
+    """Convert granularity to pandas-compatible frequency (fixes 'M' error)"""
+    if granularity == "Monthly":
+        return "ME"   # Month End - required in pandas 2.2+
+    else:
+        return "W"
 
 # ─────────────────────────────────────────────
 # DATA LOADING
@@ -123,20 +122,20 @@ REGIONS  = ["North","South","East","West","Central"]
 def generate_synthetic_dataset(path=DATA_CSV, n=900, seed=42):
     np.random.seed(seed)
     from datetime import datetime as _dt
-    start, end  = _dt(2023,1,1), _dt(2024,12,31)
-    days_range  = (end - start).days
+    start, end = _dt(2023,1,1), _dt(2024,12,31)
+    days_range = (end - start).days
     dates = [start + pd.to_timedelta(int(np.random.randint(0, days_range)), unit='D') for _ in range(n)]
     df = pd.DataFrame({
-        "Date":                 dates,
-        "Product":              np.random.choice(PRODUCTS, size=n),
-        "Region":               np.random.choice(REGIONS,  size=n),
-        "Sales_Units":          np.random.randint(30, 800, size=n),
-        "Price":                np.round(np.random.uniform(40, 600, size=n), 2),
+        "Date": dates,
+        "Product": np.random.choice(PRODUCTS, size=n),
+        "Region": np.random.choice(REGIONS, size=n),
+        "Sales_Units": np.random.randint(30, 800, size=n),
+        "Price": np.round(np.random.uniform(40, 600, size=n), 2),
         "Doctor_Prescriptions": np.random.randint(0, 50, size=n),
-        "Discount_pct":         np.round(np.random.uniform(0, 20, size=n), 2),
+        "Discount_pct": np.round(np.random.uniform(0, 20, size=n), 2),
     })
-    df['Date']        = pd.to_datetime(df['Date']).dt.date
-    df['Revenue']     = (df['Sales_Units'] * df['Price']).round(2)
+    df['Date'] = pd.to_datetime(df['Date']).dt.date
+    df['Revenue'] = (df['Sales_Units'] * df['Price']).round(2)
     df['Net_Revenue'] = (df['Revenue'] * (1 - df['Discount_pct'] / 100)).round(2)
     df = df.sort_values('Date').reset_index(drop=True)
     df.to_csv(path, index=False)
@@ -149,10 +148,10 @@ def load_dataset(path=DATA_CSV):
     else:
         df = pd.read_csv(path, parse_dates=["Date"])
         df["Date"] = pd.to_datetime(df["Date"]).dt.date
-    df["Month"]      = pd.to_datetime(df["Date"]).dt.month
-    df["Year"]       = pd.to_datetime(df["Date"]).dt.year
+    df["Month"] = pd.to_datetime(df["Date"]).dt.month
+    df["Year"] = pd.to_datetime(df["Date"]).dt.year
     df["Month_Name"] = pd.to_datetime(df["Date"]).dt.strftime("%b")
-    df["Quarter"]    = pd.to_datetime(df["Date"]).dt.quarter
+    df["Quarter"] = pd.to_datetime(df["Date"]).dt.quarter
     return df
 
 df_full = load_dataset()
@@ -176,7 +175,7 @@ st.markdown("""
 st.sidebar.markdown("## 🎛️ Dashboard Controls")
 st.sidebar.markdown("---")
 products_sel = st.sidebar.multiselect("Product(s)", options=PRODUCTS, default=PRODUCTS)
-regions_sel  = st.sidebar.multiselect("Region(s)",  options=REGIONS,  default=REGIONS)
+regions_sel = st.sidebar.multiselect("Region(s)", options=REGIONS, default=REGIONS)
 date_min = pd.to_datetime(df_full['Date']).min().date()
 date_max = pd.to_datetime(df_full['Date']).max().date()
 date_range = st.sidebar.date_input("Date Range", [date_min, date_max])
@@ -195,16 +194,18 @@ filtered = df_full[
 ].copy().reset_index(drop=True)
 
 # ─────────────────────────────────────────────
-# TABS
+# TABS - FIXED (Blank tab content issue)
 # ─────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    "📊 Overview",
-    "🔍 Deep Analysis",
-    "🤖 ML Predictions",
-    "📈 Prophet Forecast",
-    "🚨 Anomaly Detection",
-    "🧪 What-If Simulator",
-])
+col_tabs = st.columns([0.999, 0.001])[0]
+with col_tabs:
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        "📊 Overview",
+        "🔍 Deep Analysis",
+        "🤖 ML Predictions",
+        "📈 Prophet Forecast",
+        "🚨 Anomaly Detection",
+        "🧪 What-If Simulator",
+    ])
 
 # ══════════════════════════════════════════════
 # TAB 1 — OVERVIEW
@@ -212,35 +213,35 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
 with tab1:
     def compute_delta(series, date_col, cutoff):
         curr = series[pd.to_datetime(date_col) >= cutoff].sum()
-        prev = series[pd.to_datetime(date_col) <  cutoff].sum()
+        prev = series[pd.to_datetime(date_col) < cutoff].sum()
         return ((curr - prev) / prev * 100) if prev else 0.0
 
-    midpoint   = pd.to_datetime(filtered['Date']).median() if len(filtered) else pd.Timestamp.now()
-    total_rev  = filtered['Revenue'].sum()
-    total_net  = filtered['Net_Revenue'].sum()
-    total_units= filtered['Sales_Units'].sum()
-    avg_disc   = filtered['Discount_pct'].mean()
-    d_rev      = compute_delta(filtered['Revenue'],     filtered['Date'], midpoint)
-    d_net      = compute_delta(filtered['Net_Revenue'], filtered['Date'], midpoint)
-    d_units    = compute_delta(filtered['Sales_Units'], filtered['Date'], midpoint)
+    midpoint = pd.to_datetime(filtered['Date']).median() if len(filtered) else pd.Timestamp.now()
+    total_rev = filtered['Revenue'].sum()
+    total_net = filtered['Net_Revenue'].sum()
+    total_units = filtered['Sales_Units'].sum()
+    avg_disc = filtered['Discount_pct'].mean()
+
+    d_rev = compute_delta(filtered['Revenue'], filtered['Date'], midpoint)
+    d_net = compute_delta(filtered['Net_Revenue'], filtered['Date'], midpoint)
+    d_units = compute_delta(filtered['Sales_Units'], filtered['Date'], midpoint)
 
     def kpi_html(label, value, delta=None):
         delta_html = ""
         if delta is not None:
             arrow = "▲" if delta >= 0 else "▼"
-            cls   = "kpi-delta-pos" if delta >= 0 else "kpi-delta-neg"
+            cls = "kpi-delta-pos" if delta >= 0 else "kpi-delta-neg"
             delta_html = f'<div class="{cls}">{arrow} {abs(delta):.1f}% vs prior half</div>'
         return f'<div class="kpi-card"><div class="kpi-label">{label}</div><div class="kpi-value">{value}</div>{delta_html}</div>'
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.markdown(kpi_html("Total Revenue",   f"₹{total_rev/1e5:.1f}L",  d_rev),   unsafe_allow_html=True)
-    c2.markdown(kpi_html("Net Revenue",     f"₹{total_net/1e5:.1f}L",  d_net),   unsafe_allow_html=True)
-    c3.markdown(kpi_html("Units Sold",      f"{total_units:,}",         d_units), unsafe_allow_html=True)
-    c4.markdown(kpi_html("Avg Discount",    f"{avg_disc:.1f}%",         None),    unsafe_allow_html=True)
+    c1.markdown(kpi_html("Total Revenue", f"₹{total_rev/1e5:.1f}L", d_rev), unsafe_allow_html=True)
+    c2.markdown(kpi_html("Net Revenue", f"₹{total_net/1e5:.1f}L", d_net), unsafe_allow_html=True)
+    c3.markdown(kpi_html("Units Sold", f"{total_units:,}", d_units), unsafe_allow_html=True)
+    c4.markdown(kpi_html("Avg Discount", f"{avg_disc:.1f}%", None), unsafe_allow_html=True)
 
     st.markdown("<hr>", unsafe_allow_html=True)
 
-    # Revenue trend
     st.markdown('<div class="section-title">Revenue Trend</div>', unsafe_allow_html=True)
     rev_ts = filtered.groupby('Date')[['Revenue','Net_Revenue']].sum().reset_index()
     fig_trend = go.Figure()
@@ -294,6 +295,7 @@ with tab1:
 # TAB 2 — DEEP ANALYSIS
 # ══════════════════════════════════════════════
 with tab2:
+    # Your original Tab 2 code (unchanged)
     st.markdown('<div class="section-title">Quarterly Performance</div>', unsafe_allow_html=True)
     q_data = filtered.groupby(['Year','Quarter'])['Net_Revenue'].sum().reset_index()
     q_data['Period'] = "Q" + q_data['Quarter'].astype(str) + " " + q_data['Year'].astype(str)
@@ -313,7 +315,6 @@ with tab2:
         fig_sc.update_layout(paper_bgcolor='#fff', plot_bgcolor='#f8fbff',
             margin=dict(l=10,r=10,t=10,b=10), height=320)
         st.plotly_chart(fig_sc, use_container_width=True)
-
     with col2:
         st.markdown('<div class="section-title">Discount Impact on Net Revenue</div>', unsafe_allow_html=True)
         disc_bins = pd.cut(filtered['Discount_pct'], bins=[0,5,10,15,20],
@@ -342,7 +343,6 @@ with tab2:
             color_continuous_scale="RdBu_r", zmin=-1, zmax=1, aspect="auto")
         fig_cm.update_layout(paper_bgcolor='#fff', margin=dict(l=10,r=10,t=10,b=10), height=380)
         st.plotly_chart(fig_cm, use_container_width=True)
-
     with col4:
         st.markdown('<div class="section-title">Region × Product Revenue Matrix</div>', unsafe_allow_html=True)
         rp_matrix = filtered.pivot_table(values='Revenue', index='Region',
@@ -355,51 +355,47 @@ with tab2:
 # TAB 3 — ML PREDICTIONS
 # ══════════════════════════════════════════════
 with tab3:
+    # Your original Tab 3 code (unchanged)
     st.markdown('<div class="section-title">Model Training & Comparison (with 5-Fold Cross Validation)</div>',
                 unsafe_allow_html=True)
-
     ml_df = filtered.copy()
     ml_df = ml_df.drop(columns=['Date','Revenue','Year','Month_Name'], errors='ignore')
     ml_df = pd.get_dummies(ml_df, columns=['Product','Region'], drop_first=True)
-
     if 'Net_Revenue' not in ml_df.columns or len(ml_df) < 50:
         st.warning("⚠️ Not enough data for training. Expand your filters (need ≥ 50 rows).")
     else:
         X = ml_df.drop(columns=['Net_Revenue'])
         y = ml_df['Net_Revenue']
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
         models = {
-            "Linear Regression":        LinearRegression(),
-            "Random Forest":            RandomForestRegressor(n_estimators=200, random_state=42),
-            "Gradient Boosting":        GradientBoostingRegressor(n_estimators=200, random_state=42),
+            "Linear Regression": LinearRegression(),
+            "Random Forest": RandomForestRegressor(n_estimators=200, random_state=42),
+            "Gradient Boosting": GradientBoostingRegressor(n_estimators=200, random_state=42),
             "Support Vector Regressor": SVR(C=1.0, epsilon=0.2),
         }
-
         results, trained_models = {}, {}
         prog = st.progress(0, text="Training models…")
         for i, (name, model) in enumerate(models.items()):
             model.fit(X_train, y_train)
-            preds    = model.predict(X_test)
+            preds = model.predict(X_test)
             cv_scores= cross_val_score(model, X_train, y_train, cv=5, scoring='r2')
             results[name] = {
-                "MAE":          mean_absolute_error(y_test, preds),
-                "RMSE":         np.sqrt(mean_squared_error(y_test, preds)),
-                "R² (test)":    r2_score(y_test, preds),
+                "MAE": mean_absolute_error(y_test, preds),
+                "RMSE": np.sqrt(mean_squared_error(y_test, preds)),
+                "R² (test)": r2_score(y_test, preds),
                 "R² (CV mean)": cv_scores.mean(),
-                "CV Std":       cv_scores.std(),
+                "CV Std": cv_scores.std(),
             }
             trained_models[name] = (model, preds)
             prog.progress((i+1)/len(models), text=f"Trained: {name}")
         prog.empty()
-
         res_df = pd.DataFrame(results).T.sort_values("R² (test)", ascending=False)
         st.dataframe(res_df.style.format({
             "MAE":"{:.2f}", "RMSE":"{:.2f}",
             "R² (test)":"{:.3f}", "R² (CV mean)":"{:.3f}", "CV Std":"{:.3f}"
         }).background_gradient(subset=["R² (test)"], cmap="Blues"), use_container_width=True)
 
-        best_name  = res_df.index[0]
+        best_name = res_df.index[0]
         best_model, best_preds = trained_models[best_name]
         st.success(f"🏆 Best Model: **{best_name}** — R² = {res_df.loc[best_name,'R² (test)']:.3f}")
 
@@ -422,7 +418,7 @@ with tab3:
             legend=dict(orientation="h"))
         st.plotly_chart(fig_avp, use_container_width=True)
 
-        # Feature importance
+        # Feature importance, SHAP, and Live Prediction (your original code continues here)
         if hasattr(best_model, 'feature_importances_'):
             st.markdown('<div class="section-title">Feature Importances</div>', unsafe_allow_html=True)
             fi = pd.Series(best_model.feature_importances_, index=X.columns)\
@@ -436,15 +432,15 @@ with tab3:
             fig_fi.update_yaxes(autorange="reversed")
             st.plotly_chart(fig_fi, use_container_width=True)
 
-        # SHAP
+        # ... (SHAP and Live Prediction form - kept as original)
         if SHAP_AVAILABLE and hasattr(best_model, 'feature_importances_'):
             st.markdown('<div class="section-title">SHAP Explainability (Mean |SHAP| per Feature)</div>',
                         unsafe_allow_html=True)
             try:
-                explainer   = shap.TreeExplainer(best_model)
+                explainer = shap.TreeExplainer(best_model)
                 shap_values = explainer.shap_values(X_test.iloc[:200])
-                shap_df     = pd.DataFrame(np.abs(shap_values), columns=X_test.columns)
-                mean_shap   = shap_df.mean().sort_values(ascending=False).head(10).reset_index()
+                shap_df = pd.DataFrame(np.abs(shap_values), columns=X_test.columns)
+                mean_shap = shap_df.mean().sort_values(ascending=False).head(10).reset_index()
                 mean_shap.columns = ['Feature','Mean_SHAP']
                 fig_shap = px.bar(mean_shap, x='Mean_SHAP', y='Feature', orientation='h',
                     color='Mean_SHAP', color_continuous_scale=["#c8e6c9","#1b5e20"])
@@ -459,20 +455,18 @@ with tab3:
         elif not SHAP_AVAILABLE:
             st.info("📦 Install `shap` for explainability: `pip install shap`")
 
-        # Live Prediction Form
         st.markdown('<div class="section-title">🔮 Live Prediction</div>', unsafe_allow_html=True)
         with st.form("pred_form"):
             c1, c2, c3 = st.columns(3)
-            p_product  = c1.selectbox("Product", options=PRODUCTS)
-            p_region   = c2.selectbox("Region",  options=REGIONS)
-            p_month    = c3.selectbox("Month",   options=list(range(1,13)), index=datetime.now().month-1)
+            p_product = c1.selectbox("Product", options=PRODUCTS)
+            p_region = c2.selectbox("Region", options=REGIONS)
+            p_month = c3.selectbox("Month", options=list(range(1,13)), index=datetime.now().month-1)
             c4, c5, c6 = st.columns(3)
-            p_units    = c4.number_input("Sales Units",         min_value=1,   value=100)
-            p_price    = c5.number_input("Price per Unit (₹)",  min_value=1.0, value=150.0)
-            p_discount = c6.number_input("Discount %",          min_value=0.0, max_value=100.0, value=5.0)
-            p_rx       = st.number_input("Doctor Prescriptions", min_value=0, value=10)
-            submitted  = st.form_submit_button("🚀 Predict Net Revenue")
-
+            p_units = c4.number_input("Sales Units", min_value=1, value=100)
+            p_price = c5.number_input("Price per Unit (₹)", min_value=1.0, value=150.0)
+            p_discount = c6.number_input("Discount %", min_value=0.0, max_value=100.0, value=5.0)
+            p_rx = st.number_input("Doctor Prescriptions", min_value=0, value=10)
+            submitted = st.form_submit_button("🚀 Predict Net Revenue")
         if submitted:
             row = {'Sales_Units': p_units, 'Price': p_price, 'Month': p_month,
                    'Doctor_Prescriptions': p_rx, 'Discount_pct': p_discount,
@@ -481,8 +475,8 @@ with tab3:
                 if col.startswith("Product_") or col.startswith("Region_"):
                     row[col] = 0
             if f"Product_{p_product}" in X.columns: row[f"Product_{p_product}"] = 1
-            if f"Region_{p_region}"   in X.columns: row[f"Region_{p_region}"]   = 1
-            inp  = pd.DataFrame(row, index=[0]).reindex(columns=X.columns, fill_value=0)
+            if f"Region_{p_region}" in X.columns: row[f"Region_{p_region}"] = 1
+            inp = pd.DataFrame(row, index=[0]).reindex(columns=X.columns, fill_value=0)
             pred = best_model.predict(inp)[0]
             st.markdown(f"""
             <div style="background:linear-gradient(135deg,#e3f2fd,#bbdefb);padding:1.5rem;
@@ -496,22 +490,23 @@ with tab3:
             </div>""", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════
-# TAB 4 — PROPHET FORECAST
+# TAB 4 — PROPHET FORECAST (FIXED)
 # ══════════════════════════════════════════════
 with tab4:
     st.markdown('<div class="section-title">📅 Prophet Time Series Forecasting</div>', unsafe_allow_html=True)
-
     if not PROPHET_AVAILABLE:
         st.error("Prophet is not installed. Run: `pip install prophet`")
     else:
         col_opts1, col_opts2, col_opts3 = st.columns(3)
-        granularity    = col_opts1.radio("Granularity",       ["Monthly","Weekly"], horizontal=True)
-        periods_fwd    = col_opts2.slider("Periods Ahead",    3, 24, 6)
+        granularity = col_opts1.radio("Granularity", ["Monthly","Weekly"], horizontal=True)
+        periods_fwd = col_opts2.slider("Periods Ahead", 3, 24, 6)
         product_choice = col_opts3.selectbox("Product Filter", ["All Products"] + PRODUCTS)
 
-        freq = "M" if granularity == "Monthly" else "W"
+        freq = get_resample_freq(granularity)
+
         ts_raw = df_full.copy()
         ts_raw['Date'] = pd.to_datetime(ts_raw['Date'])
+
         if product_choice != "All Products":
             ts_raw = ts_raw[ts_raw['Product'] == product_choice]
 
@@ -532,12 +527,11 @@ with tab4:
                     interval_width=0.80
                 )
                 m.fit(ts_agg)
-                future   = m.make_future_dataframe(periods=periods_fwd, freq=freq)
+                future = m.make_future_dataframe(periods=periods_fwd, freq=freq)
                 forecast = m.predict(future)
 
             hist_end = ts_agg['ds'].max()
 
-            # Main chart
             fig_fc = go.Figure()
             fig_fc.add_trace(go.Scatter(
                 x=ts_agg['ds'], y=ts_agg['y'], name="Actual",
@@ -560,7 +554,6 @@ with tab4:
                 xaxis_title="", yaxis_title="Net Revenue (₹)")
             st.plotly_chart(fig_fc, use_container_width=True)
 
-            # Forecast table
             future_rows = forecast[forecast['ds'] > hist_end][
                 ['ds','yhat','yhat_lower','yhat_upper']].copy()
             future_rows.columns = ['Period','Forecast','Lower Bound','Upper Bound']
@@ -570,7 +563,6 @@ with tab4:
                 "Forecast":"{:,.0f}", "Lower Bound":"{:,.0f}", "Upper Bound":"{:,.0f}"}),
                 use_container_width=True)
 
-            # Decomposition
             st.markdown('<div class="section-title">Seasonality Decomposition</div>', unsafe_allow_html=True)
             comp_fig = make_subplots(rows=2, cols=1, subplot_titles=("Trend","Yearly Seasonality"))
             comp_fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['trend'],
@@ -594,36 +586,31 @@ with tab4:
 # TAB 5 — ANOMALY DETECTION
 # ══════════════════════════════════════════════
 with tab5:
+    # Your original Tab 5 code (unchanged)
     st.markdown('<div class="section-title">🚨 Sales Anomaly Detection — Isolation Forest</div>',
                 unsafe_allow_html=True)
     st.markdown("Isolation Forest is an unsupervised ML algorithm that **isolates anomalies** "
                 "rather than profiling normal data — ideal for detecting unusual sales events "
                 "without labelled data.")
-
     contamination = st.slider("Expected Anomaly Fraction", 0.01, 0.15, 0.05, 0.01,
                               help="Higher = more data points flagged as anomalous")
-
-    anom_df   = filtered[['Date','Sales_Units','Price','Revenue','Net_Revenue',
+    anom_df = filtered[['Date','Sales_Units','Price','Revenue','Net_Revenue',
                            'Doctor_Prescriptions','Discount_pct']].copy()
     anom_df['Date'] = pd.to_datetime(anom_df['Date'])
     feat_cols = ['Sales_Units','Price','Net_Revenue','Doctor_Prescriptions','Discount_pct']
-
-    scaler   = StandardScaler()
-    X_anom   = scaler.fit_transform(anom_df[feat_cols])
-    iso      = IsolationForest(contamination=contamination, random_state=42, n_estimators=200)
-    preds_a  = iso.fit_predict(X_anom)
-    scores   = iso.score_samples(X_anom)
-
-    anom_df['Anomaly']       = np.where(preds_a == -1, "Anomaly", "Normal")
+    scaler = StandardScaler()
+    X_anom = scaler.fit_transform(anom_df[feat_cols])
+    iso = IsolationForest(contamination=contamination, random_state=42, n_estimators=200)
+    preds_a = iso.fit_predict(X_anom)
+    scores = iso.score_samples(X_anom)
+    anom_df['Anomaly'] = np.where(preds_a == -1, "Anomaly", "Normal")
     anom_df['Anomaly_Score'] = -scores
-
     n_anom = (anom_df['Anomaly'] == "Anomaly").sum()
     col1, col2, col3 = st.columns(3)
-    col1.metric("Total Records",      len(anom_df))
+    col1.metric("Total Records", len(anom_df))
     col2.metric("Anomalies Detected", n_anom)
-    col3.metric("Anomaly Rate",       f"{n_anom/len(anom_df)*100:.1f}%")
+    col3.metric("Anomaly Rate", f"{n_anom/len(anom_df)*100:.1f}%")
 
-    # Scatter map
     st.markdown('<div class="section-title">Revenue vs Sales Units (Anomaly Map)</div>', unsafe_allow_html=True)
     fig_anom = px.scatter(anom_df, x='Sales_Units', y='Net_Revenue',
         color='Anomaly', symbol='Anomaly',
@@ -636,7 +623,6 @@ with tab5:
 
     col_d1, col_d2 = st.columns(2)
     with col_d1:
-        # Score distribution
         st.markdown('<div class="section-title">Score Distribution</div>', unsafe_allow_html=True)
         fig_dist = px.histogram(anom_df, x='Anomaly_Score', color='Anomaly', nbins=50,
             color_discrete_map={"Normal":"#1565c0","Anomaly":"#ef5350"},
@@ -644,9 +630,7 @@ with tab5:
         fig_dist.update_layout(paper_bgcolor='#fff', plot_bgcolor='#f8fbff',
             margin=dict(l=10,r=10,t=10,b=10), height=300)
         st.plotly_chart(fig_dist, use_container_width=True)
-
     with col_d2:
-        # Timeline
         st.markdown('<div class="section-title">Revenue Timeline</div>', unsafe_allow_html=True)
         fig_tl = go.Figure()
         normal_df = anom_df[anom_df['Anomaly'] == 'Normal']
@@ -672,30 +656,28 @@ with tab5:
 # TAB 6 — WHAT-IF SIMULATOR
 # ══════════════════════════════════════════════
 with tab6:
+    # Your original Tab 6 code (unchanged)
     st.markdown('<div class="section-title">🧪 Business Scenario Simulator</div>', unsafe_allow_html=True)
     st.markdown("Adjust business levers to simulate how pricing and discount decisions "
                 "impact **Net Revenue** — before committing to them.")
-
     col_l, col_r = st.columns([1, 1.6])
     with col_l:
         st.markdown("#### 🎛️ Base Parameters")
-        base_units    = st.slider("Base Sales Units",   30, 800, 200)
-        base_price    = st.slider("Base Price (₹)",     40, 600, 200)
-        base_discount = st.slider("Base Discount %",    0.0, 20.0, 5.0, 0.5)
+        base_units = st.slider("Base Sales Units", 30, 800, 200)
+        base_price = st.slider("Base Price (₹)", 40, 600, 200)
+        base_discount = st.slider("Base Discount %", 0.0, 20.0, 5.0, 0.5)
         st.markdown("---")
         st.markdown("#### 📐 Scenario Adjustments")
-        price_change    = st.slider("Price Change %",       -30, 30, 0)
-        units_change    = st.slider("Units Change %",       -30, 30, 0)
+        price_change = st.slider("Price Change %", -30, 30, 0)
+        units_change = st.slider("Units Change %", -30, 30, 0)
         discount_change = st.slider("Discount Change (pp)", -10.0, 10.0, 0.0, 0.5)
-
     with col_r:
-        new_price    = base_price    * (1 + price_change/100)
-        new_units    = base_units    * (1 + units_change/100)
+        new_price = base_price * (1 + price_change/100)
+        new_units = base_units * (1 + units_change/100)
         new_discount = min(max(base_discount + discount_change, 0), 100)
-
         base_revenue = base_units * base_price * (1 - base_discount/100)
-        new_revenue  = new_units  * new_price  * (1 - new_discount/100)
-        delta_pct    = ((new_revenue - base_revenue) / base_revenue * 100) if base_revenue else 0
+        new_revenue = new_units * new_price * (1 - new_discount/100)
+        delta_pct = ((new_revenue - base_revenue) / base_revenue * 100) if base_revenue else 0
 
         st.markdown("#### 📊 Scenario Results")
         r1, r2 = st.columns(2)
@@ -705,7 +687,6 @@ with tab6:
             <div class="kpi-value">₹{base_revenue:,.0f}</div>
             <div style="color:#78909c;font-size:0.8rem">Units: {base_units} | Price: ₹{base_price} | Disc: {base_discount:.1f}%</div>
         </div>""", unsafe_allow_html=True)
-
         dc = "#2e7d32" if delta_pct >= 0 else "#c62828"
         arrow = "▲" if delta_pct >= 0 else "▼"
         r2.markdown(f"""
@@ -715,29 +696,27 @@ with tab6:
             <div style="color:{dc};font-weight:600">{arrow} {abs(delta_pct):.1f}%</div>
         </div>""", unsafe_allow_html=True)
 
-        # Multi-scenario heatmap
         st.markdown("#### 🔀 Sensitivity Heatmap (Price × Discount)")
         scenarios = []
         for p_chg in [-20,-10,0,10,20]:
             for d_chg in [-5,0,5]:
-                s_price   = base_price    * (1 + p_chg/100)
+                s_price = base_price * (1 + p_chg/100)
                 s_discount= min(max(base_discount + d_chg, 0), 100)
                 s_revenue = base_units * s_price * (1 - s_discount/100)
                 scenarios.append({"Price Δ": f"{p_chg:+d}%",
                                    "Discount Δ": f"{d_chg:+d}pp",
                                    "Net Revenue": round(s_revenue, 2)})
         scen_df = pd.DataFrame(scenarios)
-        pivot   = scen_df.pivot(index="Discount Δ", columns="Price Δ", values="Net Revenue")
-        fig_s   = px.imshow(pivot, text_auto='.0f',
+        pivot = scen_df.pivot(index="Discount Δ", columns="Price Δ", values="Net Revenue")
+        fig_s = px.imshow(pivot, text_auto='.0f',
             color_continuous_scale="RdYlGn", aspect="auto")
         fig_s.update_layout(paper_bgcolor='#fff', margin=dict(l=10,r=10,t=10,b=10), height=260)
         st.plotly_chart(fig_s, use_container_width=True)
         st.caption("🟢 Green = higher revenue &nbsp; 🔴 Red = lower revenue")
 
-        # Breakeven
         if new_price > 0 and (1 - new_discount/100) > 0:
             breakeven = base_revenue / (new_price * (1 - new_discount/100))
-            gap       = new_units - breakeven
+            gap = new_units - breakeven
             st.markdown(f"""
             <div style="background:#e8f5e9;border-left:4px solid #2e7d32;
                 padding:1rem;border-radius:0 10px 10px 0;margin-top:1rem">
@@ -750,7 +729,7 @@ with tab6:
             </div>""", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# FOOTER (UPDATED FOR PROFESSIONAL USE)
+# FOOTER
 # ─────────────────────────────────────────────
 st.markdown("---")
 st.markdown("""
